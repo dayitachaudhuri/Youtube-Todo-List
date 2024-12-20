@@ -31,7 +31,7 @@ function restoreLastView() {
         if (lastPlaylistUrl) {
             fetchAllVideosOfPlaylist(lastPlaylistUrl);
         } else {
-            fetchAllPlaylists(); // Fallback to playlists view
+            fetchAllPlaylists(); 
         }
     } else {
         fetchAllPlaylists();
@@ -51,13 +51,13 @@ function hideBackButton() {
 // Go back to the playlists view
 function goBackToPlaylists() {
     saveCurrentView(VIEW_PLAYLISTS);
-    fetchAllPlaylists(); // Refresh playlists
-    hideBackButton(); // Hide back button
+    fetchAllPlaylists(); 
+    hideBackButton(); 
 }
 
 // Fetch all unique playlists from the server
 async function fetchAllPlaylists() {
-    saveCurrentView(VIEW_PLAYLISTS); // Save the current view as playlists
+    saveCurrentView(VIEW_PLAYLISTS); 
     try {
         const response = await fetch(`${apiUrl}/all`);
         const data = await response.json();
@@ -92,9 +92,9 @@ function displayPlaylists(playlists) {
 
 // Fetch all videos of a playlist from the server
 async function fetchAllVideosOfPlaylist(playlistUrl) {
-    saveCurrentView(VIEW_VIDEOS); // Save the current view as videos
-    saveLastPlaylist(playlistUrl); // Save the last accessed playlist
-    showBackButton(); // Show the back button to return to playlists view
+    saveCurrentView(VIEW_VIDEOS); 
+    saveLastPlaylist(playlistUrl); 
+    showBackButton(); 
     try {
         const response = await fetch(`${apiUrl}?playlistUrl=${encodeURIComponent(playlistUrl)}`);
         if (!response.ok) {
@@ -115,7 +115,6 @@ function displayVideos(videos) {
     videos.forEach((video) => {
         const li = document.createElement('li');
 
-        // Add the 'completed' class if the video is marked as completed
         if (video.completed) {
             li.classList.add('completed');
         }
@@ -178,7 +177,7 @@ async function removePlaylist(playlistUrl) {
         });
 
         if (response.ok) {
-            fetchAllPlaylists(); // Refresh the playlist list
+            fetchAllPlaylists(); 
         } else {
             alert('Failed to remove playlist.');
         }
@@ -201,7 +200,7 @@ async function removeVideo(videoUrl) {
 
         if (response.ok) {
             const lastPlaylistUrl = localStorage.getItem('lastPlaylist');
-            fetchAllVideosOfPlaylist(lastPlaylistUrl); // Refresh the videos list
+            fetchAllVideosOfPlaylist(lastPlaylistUrl); 
         } else {
             alert('Failed to remove video.');
         }
@@ -211,7 +210,16 @@ async function removeVideo(videoUrl) {
     }
 }
 
-// Function to add a playlist
+function extractPlaylistId(playlistUrl) {
+    const match = playlistUrl.match(/[?&]list=([a-zA-Z0-9_-]+)/);
+    return match ? match[1] : null; 
+}
+
+function extractVideoId(videoUrl) {
+    const match = videoUrl.match(/[?&]v=([a-zA-Z0-9_-]+)/);
+    return match ? match[1] : null;
+}
+
 async function addPlaylist() {
     const playlistUrl = urlInput.value.trim();
     if (!playlistUrl) return alert('Please enter a YouTube playlist URL.');
@@ -224,6 +232,18 @@ async function addPlaylist() {
     }
 
     await saveVideoUrls(videoUrls, playlistId);
+    urlInput.value = '';
+}
+
+// Function to add a playlist
+async function addVideo() {
+    const videoUrl = urlInput.value.trim();
+    if (!videoUrl) return alert('Please enter a YouTube video URL.');
+
+    const videoId = extractVideoId(videoUrl);
+    if (!videoId) return alert('Please enter a valid YouTube video URL.');
+
+    await saveVideoUrls([videoId], 'NO PLAYLIST');
     urlInput.value = '';
 }
 
