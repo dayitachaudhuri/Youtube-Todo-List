@@ -12,17 +12,32 @@ const addPlaylistButton = document.getElementById('addPlaylist');
 const addVideoButton = document.getElementById('addVideo');
 const backButtonContainer = document.getElementById('backButtonContainer');
 
-// Save the current view to localStorage
+// ------------------------------------------
+// 1. HELPER FUNCTIONS
+// ------------------------------------------
+
+function extractPlaylistId(playlistUrl) {
+    const match = playlistUrl.match(/[?&]list=([a-zA-Z0-9_-]+)/);
+    return match ? match[1] : null; 
+}
+
+function extractVideoId(videoUrl) {
+    const match = videoUrl.match(/[?&]v=([a-zA-Z0-9_-]+)/);
+    return match ? match[1] : null;
+}
+
+// ------------------------------------------
+// 2. LOCALSTORAGE FUNCTIONS
+// ------------------------------------------
+
 function saveCurrentView(view) {
     localStorage.setItem('currentView', view);
 }
 
-// Save the last accessed playlist to localStorage
 function saveLastPlaylist(playlistUrl) {
     localStorage.setItem('lastPlaylist', playlistUrl);
 }
 
-// Restore the last view and playlist
 function restoreLastView() {
     const currentView = localStorage.getItem('currentView');
 
@@ -38,24 +53,24 @@ function restoreLastView() {
     }
 }
 
-// Show the back button and update the view
 function showBackButton() {
     backButtonContainer.style.display = 'block';
 }
 
-// Hide the back button
 function hideBackButton() {
     backButtonContainer.style.display = 'none';
 }
 
-// Go back to the playlists view
 function goBackToPlaylists() {
     saveCurrentView(VIEW_PLAYLISTS);
     fetchAllPlaylists(); 
     hideBackButton(); 
 }
 
-// Fetch all unique playlists from the server
+// ------------------------------------------
+// 3. GET API FUNCTIONS
+// ------------------------------------------
+
 async function fetchAllPlaylists() {
     saveCurrentView(VIEW_PLAYLISTS); 
     try {
@@ -70,7 +85,143 @@ async function fetchAllPlaylists() {
     }
 }
 
-// Display playlists as embedded YouTube videos
+async function fetchAllVideosOfPlaylist(playlistUrl) {
+    saveCurrentView(VIEW_VIDEOS); 
+    saveLastPlaylist(playlistUrl); 
+    showBackButton(); 
+    try {
+        const response = await fetch(`${apiUrl}?playlistUrl=${encodeURIComponent(playlistUrl)}`);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch video URLs: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        displayVideos(data);
+    } catch (error) {
+        console.error('Error fetching video URLs:', error);
+    }
+}
+
+// ------------------------------------------
+// 4. POST API FUNCTIONS
+// ------------------------------------------
+
+async function addPlaylist() {
+    const playlistUrl = urlInput.value.trim();
+    const url = extractPlaylistId(playlistUrl);
+    const isPlaylist = true;
+    console.log(url);
+    console.log(isPlaylist);
+    if (!url) {
+        alert('Valid Playlist URL is required.');
+        return;
+    }
+    try {
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ url, isPlaylist }),
+        });
+
+        if (response.ok) {
+            const message = await response.text();
+            alert(message); 
+        } else {
+            const errorMessage = await response.text();
+            alert(`Failed to add playlist: ${errorMessage}`);
+        }
+    } catch (error) {
+        console.error('Error adding playlist:', error);
+        alert('An error occurred while adding the playlist.');
+    }
+}
+
+async function addVideo() {
+    const videoUrl = urlInput.value.trim();
+    const url = extractVideoId(videoUrl);
+    const isPlaylist = false;
+    console.log(url);
+    console.log(isPlaylist);
+    if (!url) {
+        alert('Valid Video URL is required.');
+        return;
+    }
+    try {
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ url, isPlaylist }),
+        });
+
+        if (response.ok) {
+            const message = await response.text();
+            alert(message); 
+        } else {
+            const errorMessage = await response.text();
+            alert(`Failed to add Video: ${errorMessage}`);
+        }
+    } catch (error) {
+        console.error('Error adding video:', error);
+        alert('An error occurred while adding the video.');
+    }
+}
+
+// ------------------------------------------
+// 5. DELETE API FUNCTIONS
+// ------------------------------------------
+
+async function removePlaylist(playlistUrl) {
+    try {
+        const response = await fetch(`${apiUrl}/all`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ playlistUrl }),
+        });
+
+        if (response.ok) {
+            fetchAllPlaylists(); 
+        } else {
+            alert('Failed to remove playlist.');
+        }
+    } catch (error) {
+        console.error('Error removing playlist:', error);
+        alert('Failed to remove playlist.');
+    }
+}
+
+async function removeVideo(videoUrl) {
+    try {
+        const response = await fetch(`${apiUrl}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ videoUrl }),
+        });
+
+        if (response.ok) {
+            const lastPlaylistUrl = localStorage.getItem('lastPlaylist');
+            fetchAllVideosOfPlaylist(lastPlaylistUrl); 
+        } else {
+            alert('Failed to remove video.');
+        }
+    } catch (error) {
+        console.error('Error removing video:', error);
+        alert('Failed to remove video.');
+    }
+}
+
+
+//------------------------------------------
+// 6. HTML DISPLAY FUNCTIONS
+//------------------------------------------
+
 function displayPlaylists(playlists) {
     urlList.innerHTML = '';
 
@@ -90,25 +241,6 @@ function displayPlaylists(playlists) {
     });
 }
 
-// Fetch all videos of a playlist from the server
-async function fetchAllVideosOfPlaylist(playlistUrl) {
-    saveCurrentView(VIEW_VIDEOS); 
-    saveLastPlaylist(playlistUrl); 
-    showBackButton(); 
-    try {
-        const response = await fetch(`${apiUrl}?playlistUrl=${encodeURIComponent(playlistUrl)}`);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch video URLs: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        displayVideos(data);
-    } catch (error) {
-        console.error('Error fetching video URLs:', error);
-    }
-}
-
-// Display videos in the list
 function displayVideos(videos) {
     urlList.innerHTML = '';
 
@@ -136,7 +268,6 @@ function displayVideos(videos) {
     });
 }
 
-// Toggle the "completed" status of a video
 async function toggleCompleteVideo(videoUrl, checkbox) {
     const completed = checkbox.checked;
 
@@ -163,88 +294,6 @@ async function toggleCompleteVideo(videoUrl, checkbox) {
         console.error('Error updating video completion:', error);
         alert('Failed to update video completion status.');
     }
-}
-
-// Remove a playlist by its URL from the list
-async function removePlaylist(playlistUrl) {
-    try {
-        const response = await fetch(`${apiUrl}/all`, {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ playlistUrl }),
-        });
-
-        if (response.ok) {
-            fetchAllPlaylists(); 
-        } else {
-            alert('Failed to remove playlist.');
-        }
-    } catch (error) {
-        console.error('Error removing playlist:', error);
-        alert('Failed to remove playlist.');
-    }
-}
-
-// Remove a video by its URL
-async function removeVideo(videoUrl) {
-    try {
-        const response = await fetch(`${apiUrl}`, {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ videoUrl }),
-        });
-
-        if (response.ok) {
-            const lastPlaylistUrl = localStorage.getItem('lastPlaylist');
-            fetchAllVideosOfPlaylist(lastPlaylistUrl); 
-        } else {
-            alert('Failed to remove video.');
-        }
-    } catch (error) {
-        console.error('Error removing video:', error);
-        alert('Failed to remove video.');
-    }
-}
-
-function extractPlaylistId(playlistUrl) {
-    const match = playlistUrl.match(/[?&]list=([a-zA-Z0-9_-]+)/);
-    return match ? match[1] : null; 
-}
-
-function extractVideoId(videoUrl) {
-    const match = videoUrl.match(/[?&]v=([a-zA-Z0-9_-]+)/);
-    return match ? match[1] : null;
-}
-
-async function addPlaylist() {
-    const playlistUrl = urlInput.value.trim();
-    if (!playlistUrl) return alert('Please enter a YouTube playlist URL.');
-
-    const playlistId = extractPlaylistId(playlistUrl);
-    const videoUrls = await fetchVideosFromPlaylist(playlistUrl);
-    if (videoUrls.length === 0) {
-        alert('No videos found in the playlist.');
-        return;
-    }
-
-    await saveVideoUrls(videoUrls, playlistId);
-    urlInput.value = '';
-}
-
-// Function to add a playlist
-async function addVideo() {
-    const videoUrl = urlInput.value.trim();
-    if (!videoUrl) return alert('Please enter a YouTube video URL.');
-
-    const videoId = extractVideoId(videoUrl);
-    if (!videoId) return alert('Please enter a valid YouTube video URL.');
-
-    await saveVideoUrls([videoId], 'NO PLAYLIST');
-    urlInput.value = '';
 }
 
 // Event Listeners
